@@ -5,28 +5,75 @@ using BepInEx.Configuration;
 //using System;
 //using System.IO;
 //using System.Diagnostics;
-//using Math;
+
 
 [BepInPlugin("s649_immersive_fairy_weakness", "IFW", "1.1.0.0")]
 public class IFWMain : BaseUnityPlugin {
 	internal const int EL_FairyWeak = 1204;
 	internal const int EL_WeightLifting = 207;
-	private static ConfigEntry<float> CE_WeightLimitDivide;
-	public static float configWeightLimitDivide {
-		get {return Mathf.Clamp(CE_WeightLimitDivide.Value,1f,10f);}
+	//------configEntry-------------------------------------------------------------------------------------------------------
+	private static ConfigEntry<bool> CE_FlagWeightLimitPenalty;//重量ペナルティがかかるかどうか
+	private static ConfigEntry<bool> CE_FlagKeepHandleMod;//手持ちのアイテムを扱えるかどうか//このMODのほとんどの動作で使用
+	private static ConfigEntry<bool> CE_FlagKeepLiftMod;//アイテムを持ち上げられるか
+	private static ConfigEntry<bool> CE_FlagTutorialRescue;//チュートリアルで救済をするかどうか
+
+	private static ConfigEntry<float> CE_FloatWeightLimitMulti;//重量限界乗算値
+	private static ConfigEntry<int> CE_BaseWeightCanKeepHandle;//扱えるアイテムの重さの基本値
+	private static ConfigEntry<int> CE_ModWeightCanKeepHandle;//扱えるアイテムの重さの成長値
+	private static ConfigEntry<int> CE_BaseWeightCanKeepLift;//持ち上げられる重さの基本値
+	private static ConfigEntry<int> CE_ModWeightCanKeepLift;//持ち上げられる重さの成長値
+	//---------------config props -------------------------------------------------------------------------------------
+	public static bool configFlagWeightLimitPenalty {
+		get {return CE_FlagWeightLimitPenalty.Value;}
 	}
+	public static bool configFlagKeepHandleMod {
+		get {return CE_FlagKeepHandleMod.Value;}
+	}
+	public static bool configFlagKeepLiftMod {
+		get {return CE_FlagKeepLiftMod.Value;}
+	}
+	public static bool configFlagTutorialRescue {
+		get {return CE_FlagTutorialRescue.Value;}
+	}
+	public static float configWeightLimitMulti {
+		get {return Mathf.Clamp(CE_WeightLimitMulti.Value,0.05f,1f);}
+	}
+	public static int configBaseWeightCanKeepHandle {
+		get {return Mathf.Clamp(CE_BaseWeightCanKeepHandle.Value,1000,45000);}
+	}
+	public static int configModWeightCanKeepHandle {
+		get {return Mathf.Clamp(CE_ModWeightCanKeepHandle.Value,1,100);}
+	}
+	public static int configBaseWeightCanKeepLift {
+		get {return Mathf.Clamp(CE_BaseWeightCanKeepLift.Value,1000,100000);}
+	}
+	public static int configModWeightCanKeepLift {
+		get {return Mathf.Clamp(CE_ModWeightCanKeepLift.Value,1,200);}
+	}
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	
     private void Start() {
-		CE_WeightLimitDivide = Config.Bind("#1_WeightLimit", "WeightLimitDivide", 10.0f, "Fairy PC's Weight Limit will be divided by this value");
+		CE_FlagWeightLimitPenalty = Config.Bind("#0_Flag", "FlagWeightLimitPenalty", true, "Penalize weight limits. PC Only");
+		CE_FlagKeepHandleMod = Config.Bind("#0_Flag", "FlagKeepHandleMod", true, "Limit the weight of items you can handle. PC Only");
+		CE_FlagKeepLiftMod = Config.Bind("#0_Flag", "FlagKeepLiftMod", true, "Limit the weight of items you can lift. PC Only");
+		CE_FlagTutorialRescue = Config.Bind("#0_Flag", "FlagTutorialRescue", true, "Whether to rescue in the tutorial quest.If you dare not proceed with the main quest, please turn it false.");
+		
+		CE_WeightLimitMulti = Config.Bind("#1_ValueFloat", "WeightLimitMulti", 0.1f, "PC's Weight Limit will be multiplied by this value");
+
+		CE_BaseWeightCanKeepHandle = Config.Bind("#1_ValueInt", "BaseWeightCanKeepHandle", 2000, "Base value of the weight of items that can be handled");
+		CE_ModWeightCanKeepHandle = Config.Bind("#1_ValueInt", "ModWeightCanKeepHandle", 10, "Mod value of the weight of items that can be handled");
+		CE_BaseWeightCanKeepLift = Config.Bind("#1_ValueInt", "BaseWeightCanKeepLift", 10000, "Base value of the weight of items that can be lifted");
+		CE_ModWeightCanKeepLift = Config.Bind("#1_ValueInt", "ModWeightCanKeepLift", 50, "Mod value of the weight of items that can be lifted");
 
         var harmony = new Harmony("IFWMain");
         harmony.PatchAll();
     }
-
+	
 	public static int WeightCanKeepHandle(Chara c){
-		return (c.HasElement(EL_WeightLifting))? 5000 + c.elements.Value(EL_WeightLifting) * 10: 5000;
+		return (c.HasElement(EL_WeightLifting))? 2000 + c.elements.Value(EL_WeightLifting) * 10: 2000;
 	}
 	public static int WeightCanKeepLift(Chara c){
-		return (c.HasElement(EL_WeightLifting))? 10000 + c.elements.Value(EL_WeightLifting) * 20: 10000;
+		return (c.HasElement(EL_WeightLifting))? 10000 + c.elements.Value(EL_WeightLifting) * 50: 10000;
 	}
 	public static bool IsOnGlobalMap(){
             return (EClass.pc.currentZone.id == "ntyris") ? true : false;
@@ -46,7 +93,7 @@ namespace Fairy_weight{
             Chara c = __instance;
 			if (c.IsPC && c.HasElement(IFWMain.EL_FairyWeak))
 			{
-				float rs = (float)(__result) / IFWMain.configWeightLimitDivide;
+				float rs = (float)(__result) * IFWMain.configWeightLimitMulti;
                 __result = (int)rs;
             	//__result = __instance.STR * 50 + __instance.END * 25 + __instance.Evalue(207) * 500 + 4500;
 			}
