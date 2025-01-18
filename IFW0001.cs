@@ -146,8 +146,39 @@ namespace Fairy_weight{
 			
 		}	
 	}
-}
+	[HarmonyPatch]
+	public class AshPatch
+	{
+		[HarmonyPostfix]
+		[HarmonyPatch(typeof(ThingGen), "_Create")]
+		public static void AshExe(string id, int idMat, int lv, Thing __result)
+		{
+			if(QuestMain.Phase <= 200){
+				if(id == "axe"){
+					__result.ChangeMaterial(78);//plastic
+				}
+			}
+			
+		}
+		
+	}
 
+
+}
+//----template-----------------------------------------
+/*
+[HarmonyPatch]
+	public class NanikaPatch
+	{
+		[HarmonyPrefix]
+		[HarmonyPatch(typeof(Nanika), "Doreka")]
+		public static bool NanikaPatch(Doreka __instance)
+		{
+			
+			
+		}	
+	}
+*/
 //namespace TooHeavyToHandle {
 ////[HarmonyPatch]
 		
