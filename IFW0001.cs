@@ -2,8 +2,8 @@ using UnityEngine;
 using BepInEx;
 using HarmonyLib;
 using BepInEx.Configuration;
-using Fairy_weight;
-using Fairy_weight.IFWMain;
+//using Fairy_weight;
+//using Fairy_weight.IFWMain;
 //using System;
 //using System.IO;
 //using System.Diagnostics;
@@ -21,7 +21,7 @@ public class IFWMain : BaseUnityPlugin {
 	//private static ConfigEntry<bool> CE_FlagKeepLiftMod;//アイテムを持ち上げられるか　↑とまとめる
 	private static ConfigEntry<bool> CE_FlagTutorialRescue;//チュートリアルで救済をするかどうか
 
-	private static ConfigEntry<float> CE_FloatWeightLimitMulti;//重量限界乗算値
+	private static ConfigEntry<float> CE_WeightLimitMulti;//重量限界乗算値
 	private static ConfigEntry<int> CE_BaseWeightCanKeepHandle;//扱えるアイテムの重さの基本値
 	private static ConfigEntry<int> CE_ModWeightCanKeepHandle;//扱えるアイテムの重さの成長値
 	private static ConfigEntry<int> CE_BaseWeightCanKeepLift;//持ち上げられる重さの基本値
@@ -101,10 +101,10 @@ public class IFWMain : BaseUnityPlugin {
 		public static void WeightLimit_PostPatch(Chara __instance, ref int __result)
 		{
             Chara c = __instance;
-			if (c.IsPC && c.HasElement(IFWMain.EL_FairyWeak) && configFlagWeightLimitPenalty)
+			if (c.IsPC && c.HasElement(IFWMain.EL_FairyWeak) && IFWMain.configFlagWeightLimitPenalty)
 			{
 				float rs = (float)(__result) * IFWMain.configWeightLimitMulti;
-                __result = (int)rs;
+				__result = (int)rs;
             	//__result = __instance.STR * 50 + __instance.END * 25 + __instance.Evalue(207) * 500 + 4500;
 			}
 		}
@@ -130,7 +130,7 @@ public class IFWMain : BaseUnityPlugin {
 				}
 
 				
-				if(c.ai is GoalManualMove && configFlagKeepHandleMod){
+				if(c.ai is GoalManualMove && IFWMain.configFlagKeepHandleMod){
 					if(c.held != null){
 						//Debug.Log("[IFW] " + c.held.ToString());
 						if(c.held.ChildrenAndSelfWeight > IFWMain.WeightCanKeepLift(c)){
@@ -140,7 +140,7 @@ public class IFWMain : BaseUnityPlugin {
 						}
 					}
 				}
-				if(c.ai is TaskHarvest  && configFlagKeepHandleMod){
+				if(c.ai is TaskHarvest  && IFWMain.configFlagKeepHandleMod){
 					if(c.held != null){
 						//Debug.Log("[IFW] " + c.held.ToString());
 						if(c.held.ChildrenAndSelfWeight > IFWMain.WeightCanKeepHandle(c)){
@@ -151,7 +151,7 @@ public class IFWMain : BaseUnityPlugin {
 					}
 				}
 				//ai is AI_PlayMusic
-				if(c.ai is AI_PlayMusic && configFlagKeepHandleMod){
+				if(c.ai is AI_PlayMusic && IFWMain.configFlagKeepHandleMod){
 					AI_PlayMusic aiplay = (AI_PlayMusic)c.ai;
 					if(c.held == aiplay.tool && c.held.ChildrenAndSelfWeight > IFWMain.WeightCanKeepHandle(c)){
 						Msg.Say("tooHeavyToEquip", c.held);
@@ -173,7 +173,7 @@ public class IFWMain : BaseUnityPlugin {
 		public static bool CanThrowTest(Chara c,Thing t,Card target,Point p)
 		{
 			
-			if(t.SelfWeight > IFWMain.WeightCanKeepHandle(c) && configFlagKeepHandleMod){
+			if(t.SelfWeight > IFWMain.WeightCanKeepHandle(c) && IFWMain.configFlagKeepHandleMod){
 				//if(t != null){Debug.Log("[IFW]throw : "+ t.ToString() + "->" + t.SelfWeight.ToString());}
 				//Msg.SayRaw("TooHeavy");
 				return false;
@@ -187,11 +187,11 @@ public class IFWMain : BaseUnityPlugin {
 	public class RangedPatch
 	{
 		[HarmonyPrefix]
-		[HarmonyPatch(typeof(ActRanged), "CanPerform")]
+		[HarmonyPatch(typeof(ActRanged), "Perform")]
 		public static bool CanActRangedTest(ActRanged __instance)
 		{
 			ActRanged ar = __instance;
-			if(configFlagKeepHandleMod && ar != null){
+			if(IFWMain.configFlagKeepHandleMod && ar != null){
 				Chara cc = Act.CC;
 				Thing tool = Act.TOOL;
 				if(cc != null && tool != null){Debug.Log("[IFW]Ranged : "+ cc.ToString() + "->" + tool.ToString());}//debug
@@ -211,7 +211,7 @@ public class IFWMain : BaseUnityPlugin {
 		[HarmonyPatch(typeof(ThingGen), "_Create")]
 		public static void AshExe(string id, int idMat, int lv, Thing __result)
 		{
-			if(configFlagTutorialRescue && QuestMain.Phase <= 200){
+			if(IFWMain.configFlagTutorialRescue && QuestMain.Phase <= 200){
 				if(id == "axe"){
 					__result.ChangeMaterial(78);//plastic
 				}
@@ -221,16 +221,40 @@ public class IFWMain : BaseUnityPlugin {
 		
 	}
 
+	[HarmonyPatch]
+	public class ActTest
+	{
+		[HarmonyPostfix]
+		[HarmonyPatch(typeof(Act), "Perform")]
+		public static void CanPerformPatch(Act __instance)
+		{
+			Debug.Log("[IFW]CanPerform" + __instance.ToString());	
+		}	
+	}
 
 }
 //----template-----------------------------------------
+
+//Debug.Log("");
 /*
-[HarmonyPatch]
+	[HarmonyPatch]
 	public class NanikaPatch
 	{
 		[HarmonyPrefix]
 		[HarmonyPatch(typeof(Nanika), "Doreka")]
 		public static bool NanikaPatch(Doreka __instance)
+		{
+			
+			
+		}	
+	}
+
+	[HarmonyPatch]
+	public class NanikaPatch
+	{
+		[HarmonyPostfix]
+		[HarmonyPatch(typeof(Nanika), "Doreka")]
+		public static void NanikaPatch(Doreka __instance)
 		{
 			
 			
