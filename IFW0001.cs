@@ -2,19 +2,23 @@ using UnityEngine;
 using BepInEx;
 using HarmonyLib;
 using BepInEx.Configuration;
+using Fairy_weight;
+using Fairy_weight.IFWMain;
 //using System;
 //using System.IO;
 //using System.Diagnostics;
 
+
+namespace Fairy_weight{
 
 [BepInPlugin("s649_immersive_fairy_weakness", "IFW", "1.1.0.0")]
 public class IFWMain : BaseUnityPlugin {
 	internal const int EL_FairyWeak = 1204;
 	internal const int EL_WeightLifting = 207;
 	//------configEntry-------------------------------------------------------------------------------------------------------
-	private static ConfigEntry<bool> CE_FlagWeightLimitPenalty;//重量ペナルティがかかるかどうか
+	private static ConfigEntry<bool> CE_FlagWeightLimitPenalty;//重量限界にペナルティがかかるかどうか
 	private static ConfigEntry<bool> CE_FlagKeepHandleMod;//手持ちのアイテムを扱えるかどうか//このMODのほとんどの動作で使用
-	private static ConfigEntry<bool> CE_FlagKeepLiftMod;//アイテムを持ち上げられるか
+	//private static ConfigEntry<bool> CE_FlagKeepLiftMod;//アイテムを持ち上げられるか　↑とまとめる
 	private static ConfigEntry<bool> CE_FlagTutorialRescue;//チュートリアルで救済をするかどうか
 
 	private static ConfigEntry<float> CE_FloatWeightLimitMulti;//重量限界乗算値
@@ -29,9 +33,11 @@ public class IFWMain : BaseUnityPlugin {
 	public static bool configFlagKeepHandleMod {
 		get {return CE_FlagKeepHandleMod.Value;}
 	}
+	/*
 	public static bool configFlagKeepLiftMod {
 		get {return CE_FlagKeepLiftMod.Value;}
 	}
+	*/
 	public static bool configFlagTutorialRescue {
 		get {return CE_FlagTutorialRescue.Value;}
 	}
@@ -39,7 +45,7 @@ public class IFWMain : BaseUnityPlugin {
 		get {return Mathf.Clamp(CE_WeightLimitMulti.Value,0.05f,1f);}
 	}
 	public static int configBaseWeightCanKeepHandle {
-		get {return Mathf.Clamp(CE_BaseWeightCanKeepHandle.Value,1000,45000);}
+		get {return Mathf.Clamp(CE_BaseWeightCanKeepHandle.Value,1000,50000);}
 	}
 	public static int configModWeightCanKeepHandle {
 		get {return Mathf.Clamp(CE_ModWeightCanKeepHandle.Value,1,100);}
@@ -55,7 +61,7 @@ public class IFWMain : BaseUnityPlugin {
     private void Start() {
 		CE_FlagWeightLimitPenalty = Config.Bind("#0_Flag", "FlagWeightLimitPenalty", true, "Penalize weight limits. PC Only");
 		CE_FlagKeepHandleMod = Config.Bind("#0_Flag", "FlagKeepHandleMod", true, "Limit the weight of items you can handle. PC Only");
-		CE_FlagKeepLiftMod = Config.Bind("#0_Flag", "FlagKeepLiftMod", true, "Limit the weight of items you can lift. PC Only");
+		//CE_FlagKeepLiftMod = Config.Bind("#0_Flag", "FlagKeepLiftMod", true, "Limit the weight of items you can lift. PC Only");
 		CE_FlagTutorialRescue = Config.Bind("#0_Flag", "FlagTutorialRescue", true, "Whether to rescue in the tutorial quest.If you dare not proceed with the main quest, please turn it false.");
 		
 		CE_WeightLimitMulti = Config.Bind("#1_ValueFloat", "WeightLimitMulti", 0.1f, "PC's Weight Limit will be multiplied by this value");
@@ -70,17 +76,21 @@ public class IFWMain : BaseUnityPlugin {
     }
 	
 	public static int WeightCanKeepHandle(Chara c){
-		return (c.HasElement(EL_WeightLifting))? 2000 + c.elements.Value(EL_WeightLifting) * 10: 2000;
+		int baseV = configBaseWeightCanKeepHandle;
+		int modV = configModWeightCanKeepHandle;
+		return (c.HasElement(EL_WeightLifting))? baseV + c.elements.Value(EL_WeightLifting) * modV: baseV;
 	}
 	public static int WeightCanKeepLift(Chara c){
-		return (c.HasElement(EL_WeightLifting))? 10000 + c.elements.Value(EL_WeightLifting) * 50: 10000;
+		int baseV = configBaseWeightCanKeepLift;
+		int modV = configModWeightCanKeepLift;
+		return (c.HasElement(EL_WeightLifting))? baseV + c.elements.Value(EL_WeightLifting) * modV: baseV;
 	}
 	public static bool IsOnGlobalMap(){
-            return (EClass.pc.currentZone.id == "ntyris") ? true : false;
-        }
+        return (EClass.pc.currentZone.id == "ntyris") ? true : false;
+    }
 }
 
-namespace Fairy_weight{
+
 	
 	[HarmonyPatch]
 	public class WeightPatch
@@ -91,7 +101,7 @@ namespace Fairy_weight{
 		public static void WeightLimit_PostPatch(Chara __instance, ref int __result)
 		{
             Chara c = __instance;
-			if (c.IsPC && c.HasElement(IFWMain.EL_FairyWeak))
+			if (c.IsPC && c.HasElement(IFWMain.EL_FairyWeak) && configFlagWeightLimitPenalty)
 			{
 				float rs = (float)(__result) * IFWMain.configWeightLimitMulti;
                 __result = (int)rs;
@@ -111,6 +121,7 @@ namespace Fairy_weight{
 			
 			if(c.IsPC && c.HasElement(IFWMain.EL_FairyWeak)){
 				//if(!IFWMain.IsOnGlobalMap()){Debug.Log("[IFW}]C:" + c.ai.ToString());}
+				//debug
 				if(actBefore != null){
 					if(actBefore.ToString() != c.ai.ToString())
 					Debug.Log("[IFW}]C:" + c.ai.ToString() + ":before->" + actBefore.ToString());
@@ -119,7 +130,7 @@ namespace Fairy_weight{
 				}
 
 				
-				if(c.ai is GoalManualMove){
+				if(c.ai is GoalManualMove && configFlagKeepHandleMod){
 					if(c.held != null){
 						//Debug.Log("[IFW] " + c.held.ToString());
 						if(c.held.ChildrenAndSelfWeight > IFWMain.WeightCanKeepLift(c)){
@@ -129,7 +140,7 @@ namespace Fairy_weight{
 						}
 					}
 				}
-				if(c.ai is TaskHarvest){
+				if(c.ai is TaskHarvest  && configFlagKeepHandleMod){
 					if(c.held != null){
 						//Debug.Log("[IFW] " + c.held.ToString());
 						if(c.held.ChildrenAndSelfWeight > IFWMain.WeightCanKeepHandle(c)){
@@ -140,7 +151,7 @@ namespace Fairy_weight{
 					}
 				}
 				//ai is AI_PlayMusic
-				if(c.ai is AI_PlayMusic){
+				if(c.ai is AI_PlayMusic && configFlagKeepHandleMod){
 					AI_PlayMusic aiplay = (AI_PlayMusic)c.ai;
 					if(c.held == aiplay.tool && c.held.ChildrenAndSelfWeight > IFWMain.WeightCanKeepHandle(c)){
 						Msg.Say("tooHeavyToEquip", c.held);
@@ -162,7 +173,7 @@ namespace Fairy_weight{
 		public static bool CanThrowTest(Chara c,Thing t,Card target,Point p)
 		{
 			
-			if(t.SelfWeight >  IFWMain.WeightCanKeepHandle(c)){
+			if(t.SelfWeight > IFWMain.WeightCanKeepHandle(c) && configFlagKeepHandleMod){
 				//if(t != null){Debug.Log("[IFW]throw : "+ t.ToString() + "->" + t.SelfWeight.ToString());}
 				//Msg.SayRaw("TooHeavy");
 				return false;
@@ -180,10 +191,10 @@ namespace Fairy_weight{
 		public static bool CanActRangedTest(ActRanged __instance)
 		{
 			ActRanged ar = __instance;
-			if(ar != null){
+			if(configFlagKeepHandleMod && ar != null){
 				Chara cc = Act.CC;
 				Thing tool = Act.TOOL;
-				if(cc != null && tool != null){Debug.Log("[IFW]Ranged : "+ cc.ToString() + "->" + tool.ToString());}
+				if(cc != null && tool != null){Debug.Log("[IFW]Ranged : "+ cc.ToString() + "->" + tool.ToString());}//debug
 				
 				//Msg.SayRaw("TooHeavy");
 				//return false;
@@ -200,7 +211,7 @@ namespace Fairy_weight{
 		[HarmonyPatch(typeof(ThingGen), "_Create")]
 		public static void AshExe(string id, int idMat, int lv, Thing __result)
 		{
-			if(QuestMain.Phase <= 200){
+			if(configFlagTutorialRescue && QuestMain.Phase <= 200){
 				if(id == "axe"){
 					__result.ChangeMaterial(78);//plastic
 				}
