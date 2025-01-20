@@ -123,12 +123,12 @@ public class IFWMain : BaseUnityPlugin {
 				//if(!IFWMain.IsOnGlobalMap()){Debug.Log("[IFW}]C:" + c.ai.ToString());}
 				//debug
 				if(actBefore != null){
-					if(actBefore.ToString() != c.ai.ToString())
-					Debug.Log("[IFW}]C:" + c.ai.ToString() + ":before->" + actBefore.ToString());
+					//if(actBefore.ToString() != c.ai.ToString())
+					//Debug.Log("[IFW}]C:" + c.ai.ToString() + ":before->" + actBefore.ToString());
 				} else {
-					Debug.Log("[IFW}]C:" + c.ai.ToString());
+					//Debug.Log("[IFW}]C:" + c.ai.ToString());
 				}
-
+				
 				
 				if(c.ai is GoalManualMove && IFWMain.configFlagKeepHandleMod){
 					if(c.held != null){
@@ -187,14 +187,22 @@ public class IFWMain : BaseUnityPlugin {
 	public class RangedPatch
 	{
 		[HarmonyPrefix]
-		[HarmonyPatch(typeof(ActRanged), "Perform")]
+		[HarmonyPatch(typeof(ActRanged), "CanPerform")]
 		public static bool CanActRangedTest(ActRanged __instance)
 		{
 			ActRanged ar = __instance;
 			if(IFWMain.configFlagKeepHandleMod && ar != null){
 				Chara cc = Act.CC;
+				if(!cc.IsPC){return true;}
+				Chara tc = Act.CC;
 				Thing tool = Act.TOOL;
-				if(cc != null && tool != null){Debug.Log("[IFW]Ranged : "+ cc.ToString() + "->" + tool.ToString());}//debug
+				if(tc != null && tool != null){
+					Debug.Log("[IFW]Ranged : "+ cc.ToString() + "->" + tool.ToString());
+					if(tool.SelfWeight > IFWMain.WeightCanKeepHandle(cc) && IFWMain.configFlagKeepHandleMod){
+						Debug("[IFW]you lose :" + tool.SelfWeight.ToString() + "vs" + IFWMain.WeightCanKeepHandle(cc).ToString());
+						return false;
+					}
+				}//debug
 				
 				//Msg.SayRaw("TooHeavy");
 				//return false;
@@ -220,18 +228,31 @@ public class IFWMain : BaseUnityPlugin {
 		}
 		
 	}
-
+	/*
 	[HarmonyPatch]
-	public class ActTest
+	public class MochiageTest
 	{
 		[HarmonyPostfix]
-		[HarmonyPatch(typeof(Act), "Perform")]
-		public static void CanPerformPatch(Act __instance)
+		[HarmonyPatch(typeof(Chara), "CanLift")]
+		public static void MochiagePatch(bool __result)
 		{
-			Debug.Log("[IFW]CanPerform" + __instance.ToString());	
-		}	
-	}
+			
+			if(__instance.IsPC && IFWMain.configFlagKeepHandleMod){
+				Debug.Log("[IFW]CanLift:" + c.ChildrenAndSelfWeight.ToString() + "vs" + IFWMain.WeightCanKeepLift(__instance).ToString());
 
+				if(c.ChildrenAndSelfWeight > IFWMain.WeightCanKeepLift(__instance)){
+					Debug.Log("[IFW]lose...");
+					
+				}
+				
+			}
+			
+			Debug.Log("[IFW]lose...");
+			__result = false;
+		}
+
+	}
+	*/
 }
 //----template-----------------------------------------
 
