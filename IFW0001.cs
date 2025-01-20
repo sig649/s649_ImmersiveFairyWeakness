@@ -199,7 +199,7 @@ public class IFWMain : BaseUnityPlugin {
 				if(tc != null && tool != null){
 					Debug.Log("[IFW]Ranged : "+ cc.ToString() + "->" + tool.ToString());
 					if(tool.SelfWeight > IFWMain.WeightCanKeepHandle(cc) && IFWMain.configFlagKeepHandleMod){
-						Debug("[IFW]you lose :" + tool.SelfWeight.ToString() + "vs" + IFWMain.WeightCanKeepHandle(cc).ToString());
+						Debug.Log("[IFW]you lose :" + tool.SelfWeight.ToString() + "vs" + IFWMain.WeightCanKeepHandle(cc).ToString());
 						return false;
 					}
 				}//debug
