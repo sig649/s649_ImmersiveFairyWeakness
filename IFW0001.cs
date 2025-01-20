@@ -76,12 +76,12 @@ public class IFWMain : BaseUnityPlugin {
     }
 	
 	public static int WeightCanKeepHandle(Chara c){
-		int baseV = configBaseWeightCanKeepHandle;
+		int baseV = configBaseWeightCanKeepHandle + c.STR * 2 + c.END * 1;
 		int modV = configModWeightCanKeepHandle;
 		return (c.HasElement(EL_WeightLifting))? baseV + c.elements.Value(EL_WeightLifting) * modV: baseV;
 	}
 	public static int WeightCanKeepLift(Chara c){
-		int baseV = configBaseWeightCanKeepLift;
+		int baseV = configBaseWeightCanKeepLift + c.STR * 10 + c.END * 5;
 		int modV = configModWeightCanKeepLift;
 		return (c.HasElement(EL_WeightLifting))? baseV + c.elements.Value(EL_WeightLifting) * modV: baseV;
 	}
