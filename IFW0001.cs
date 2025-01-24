@@ -85,6 +85,22 @@ public class IFWMain : BaseUnityPlugin {
 		int modV = configModWeightCanKeepLift;
 		return (c.HasElement(EL_WeightLifting))? baseV + c.elements.Value(EL_WeightLifting) * modV: baseV;
 	}
+	public static bool CanKeepTask(Chara c){
+		if(!configFlagKeepHandleMod){return true;}
+		if(c.held.ChildrenAndSelfWeight > WeightCanKeepHandle(c)){
+			return false;
+		} else {
+			return true;
+		}
+	}
+	public static bool CanKeepLift(Chara c){
+		if(!configFlagKeepHandleMod){return true;}
+		if(c.held.ChildrenAndSelfWeight > WeightCanKeepLift(c)){
+			return false;
+		} else {
+			return true;
+		}
+	}
 	public static bool IsOnGlobalMap(){
         return (EClass.pc.currentZone.id == "ntyris") ? true : false;
     }
@@ -112,14 +128,38 @@ public class IFWMain : BaseUnityPlugin {
 	}
 	[HarmonyPatch]
 	public class TickPatch{
+		
 		private static AIAct actBefore;
+		private static void DropOrTaskStop(Chara c){
+			switch(c.ai){
+				case GoalManualMove : 
+					if(IFWMain.CanKeepLift(c)){
+						Msg.Say("tooHeavyToEquip", c.held);
+						c.DropHeld();
+					}
+					break;
+				case TaskMine or TaskCut or TaskHarvest:
+					if(IFWMain.CanKeepLift(c)){
+						Msg.Say("tooHeavyToEquip", c.held);
+						c.ai.Current.TryCancel(c.held);
+						c.DropHeld();
+					} else {
+						if(IFWMain.CanKeepTask(c)){
+							Msg.Say("tooHeavyToEquip", c.held);
+							c.ai.Current.TryCancel(c.held);
+						}
+					}
+					break;
+				case AI_PlayMusic :
+			}
+		}
 
 		[HarmonyPostfix]
 		[HarmonyPatch(typeof(Chara),"TickConditions")]
 		public static void TickConditionsPatch(Chara __instance){
 			Chara c = __instance;
 			
-			if(c.IsPC && c.HasElement(IFWMain.EL_FairyWeak)){
+			if(c.IsPC && c.HasElement(IFWMain.EL_FairyWeak) && c.held != null){
 				//if(!IFWMain.IsOnGlobalMap()){Debug.Log("[IFW}]C:" + c.ai.ToString());}
 				//debug
 				if(actBefore != null){
@@ -128,28 +168,11 @@ public class IFWMain : BaseUnityPlugin {
 				} else {
 					//Debug.Log("[IFW}]C:" + c.ai.ToString());
 				}
+				//１．重くて落としてしまう判定
+				//2.落とさないが中断してしまう判定
+				DropOrTaskStop(c);
 				
 				
-				if(c.ai is GoalManualMove && IFWMain.configFlagKeepHandleMod){
-					if(c.held != null){
-						//Debug.Log("[IFW] " + c.held.ToString());
-						if(c.held.ChildrenAndSelfWeight > IFWMain.WeightCanKeepLift(c)){
-							Msg.Say("tooHeavyToEquip", c.held);
-							c.DropHeld();
-							
-						}
-					}
-				}
-				if(c.ai is TaskHarvest  && IFWMain.configFlagKeepHandleMod){
-					if(c.held != null){
-						//Debug.Log("[IFW] " + c.held.ToString());
-						if(c.held.ChildrenAndSelfWeight > IFWMain.WeightCanKeepHandle(c)){
-							Msg.Say("tooHeavyToEquip", c.held);
-							c.ai.Current.TryCancel(c.held);
-							
-						}
-					}
-				}
 				//ai is AI_PlayMusic
 				if(c.ai is AI_PlayMusic && IFWMain.configFlagKeepHandleMod){
 					AI_PlayMusic aiplay = (AI_PlayMusic)c.ai;
