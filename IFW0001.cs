@@ -131,14 +131,15 @@ public class IFWMain : BaseUnityPlugin {
 		
 		private static AIAct actBefore;
 		private static void DropOrTaskStop(Chara c){
-			switch(c.ai){
+			if(c.held != null){
+				switch(c.ai){
 				case GoalManualMove : 
 					if(IFWMain.CanKeepLift(c)){
 						Msg.Say("tooHeavyToEquip", c.held);
 						c.DropHeld();
 					}
 					break;
-				case TaskMine or TaskCut or TaskHarvest:
+				case TaskMine or TaskCut or TaskHarvest or AI_PlayMusic:
 					if(IFWMain.CanKeepLift(c)){
 						Msg.Say("tooHeavyToEquip", c.held);
 						c.ai.Current.TryCancel(c.held);
@@ -150,8 +151,9 @@ public class IFWMain : BaseUnityPlugin {
 						}
 					}
 					break;
-				case AI_PlayMusic :
+				}
 			}
+			
 		}
 
 		[HarmonyPostfix]
@@ -172,16 +174,6 @@ public class IFWMain : BaseUnityPlugin {
 				//2.落とさないが中断してしまう判定
 				DropOrTaskStop(c);
 				
-				
-				//ai is AI_PlayMusic
-				if(c.ai is AI_PlayMusic && IFWMain.configFlagKeepHandleMod){
-					AI_PlayMusic aiplay = (AI_PlayMusic)c.ai;
-					if(c.held == aiplay.tool && c.held.ChildrenAndSelfWeight > IFWMain.WeightCanKeepHandle(c)){
-						Msg.Say("tooHeavyToEquip", c.held);
-						c.ai.Current.TryCancel(c.held);
-					}
-				}
-
 				actBefore = c.ai;
 			}
 		}
@@ -239,43 +231,37 @@ public class IFWMain : BaseUnityPlugin {
 	public class AshPatch
 	{
 		[HarmonyPostfix]
-		[HarmonyPatch(typeof(ThingGen), "_Create")]
-		public static void AshExe(string id, int idMat, int lv, Thing __result)
+		[HarmonyPatch(typeof(ThingGen), "Create")]
+		public static void AshExe(string id, Thing __result)
 		{
 			if(IFWMain.configFlagTutorialRescue && QuestMain.Phase <= 200){
 				if(id == "axe"){
-					__result.ChangeMaterial(78);//plastic
+					Thing t = __result;
+					t.ChangeMaterial(78);//plastic
+					__result = t;
 				}
 			}
 			
 		}
 		
 	}
-	/*
+	
 	[HarmonyPatch]
-	public class MochiageTest
+	public class PlayerPatch
 	{
 		[HarmonyPostfix]
-		[HarmonyPatch(typeof(Chara), "CanLift")]
-		public static void MochiagePatch(bool __result)
-		{
-			
-			if(__instance.IsPC && IFWMain.configFlagKeepHandleMod){
-				Debug.Log("[IFW]CanLift:" + c.ChildrenAndSelfWeight.ToString() + "vs" + IFWMain.WeightCanKeepLift(__instance).ToString());
-
-				if(c.ChildrenAndSelfWeight > IFWMain.WeightCanKeepLift(__instance)){
-					Debug.Log("[IFW]lose...");
-					
+		[HarmonyPatch(typeof(Player), "RefreshCurrentHotItem")]
+		public static void PatchExe(){
+			if(IFWMain.configFlagKeepHandleMod){
+				Chara c = EClass.pc;
+				if(c.held != null){
+					if(!IFWMain.CanKeepTask(c)){
+						Msg.Say("このアイテムを扱うのにはちょっと重すぎる[" + c.held.ChildrenAndSelfWeight.ToString() + "/" + IFWMain.WeightCanKeepHandle(c).ToString() + "]");
+					}
 				}
-				
 			}
-			
-			Debug.Log("[IFW]lose...");
-			__result = false;
 		}
-
 	}
-	*/
 }
 //----template-----------------------------------------
 
