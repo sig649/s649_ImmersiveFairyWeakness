@@ -231,8 +231,8 @@ public class IFWMain : BaseUnityPlugin {
 	public class AshPatch
 	{
 		[HarmonyPostfix]
-		[HarmonyPatch(typeof(ThingGen), "Create")]
-		public static void AshExe(string id, Thing __result)
+		[HarmonyPatch(typeof(ThingGen), "_Create")]
+		public static void AshExe(string id, int idMat, int lv,Thing __result)
 		{
 			if(IFWMain.configFlagTutorialRescue && QuestMain.Phase <= 200){
 				if(id == "axe"){
