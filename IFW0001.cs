@@ -17,8 +17,11 @@ public class IFWMain : BaseUnityPlugin {
 	internal const int EL_WeightLifting = 207;
 	//------configEntry-------------------------------------------------------------------------------------------------------
 	private static ConfigEntry<bool> CE_FlagWeightLimitPenalty;//重量限界にペナルティがかかるかどうか
+	private static ConfigEntry<bool> CE_FlagWeightLimitPenaltyForAnyPlayer;//全てのプレイヤーに重量限界にペナルティがかかるかどうか。上のオプションよりも優先される
+
 	private static ConfigEntry<bool> CE_FlagKeepHandleMod;//手持ちのアイテムを扱えるかどうか//このMODのほとんどの動作で使用
 	//private static ConfigEntry<bool> CE_FlagKeepLiftMod;//アイテムを持ち上げられるか　↑とまとめる
+	private static ConfigEntry<bool> CE_FlagKeepHandleModForAnyPlayer;//全てのプレイヤーが手持ちのアイテムを扱えるかどうか。上のオプションよりも優先される
 	private static ConfigEntry<bool> CE_FlagTutorialRescue;//チュートリアルで救済をするかどうか
 
 	private static ConfigEntry<float> CE_WeightLimitMulti;//重量限界乗算値
@@ -30,8 +33,14 @@ public class IFWMain : BaseUnityPlugin {
 	public static bool configFlagWeightLimitPenalty {
 		get {return CE_FlagWeightLimitPenalty.Value;}
 	}
+	public static bool configFlagWeightLimitPenaltyForAnyPlayer {
+		get {return CE_FlagWeightLimitPenaltyForAnyPlayer.Value;}
+	}
 	public static bool configFlagKeepHandleMod {
 		get {return CE_FlagKeepHandleMod.Value;}
+	}
+	public static bool configFlagKeepHandleModForAnyPlayer {
+		get {return CE_FlagKeepHandleModForAnyPlayer.Value;}
 	}
 	/*
 	public static bool configFlagKeepLiftMod {
@@ -59,10 +68,12 @@ public class IFWMain : BaseUnityPlugin {
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	
     private void Start() {
-		CE_FlagWeightLimitPenalty = Config.Bind("#0_Flag", "FlagWeightLimitPenalty", true, "Penalize weight limits. PC Only");
-		CE_FlagKeepHandleMod = Config.Bind("#0_Flag", "FlagKeepHandleMod", true, "Limit the weight of items you can handle. PC Only");
+		CE_FlagWeightLimitPenalty = Config.Bind("#00_Flag", "FlagWeightLimitPenalty", true, "Penalize weight limits. PC Only");
+		CE_FlagWeightLimitPenaltyForAnyPlayer = Config.Bind("#00_Flag", "FlagWeightLimitPenaltyForAnyPlayer", false, "Penalize weight limits.ForAnyPlayer priority");
+		CE_FlagKeepHandleMod = Config.Bind("#01_Flag", "FlagKeepHandleMod", true, "Limit the weight of items you can handle. PC Only");
+		CE_FlagKeepHandleModForAnyPlayer = Config.Bind("#01_Flag", "FlagKeepHandleModForAnyPlayer", false, "Limit the weight of items you can handle.ForAnyPlayer priority");
 		//CE_FlagKeepLiftMod = Config.Bind("#0_Flag", "FlagKeepLiftMod", true, "Limit the weight of items you can lift. PC Only");
-		CE_FlagTutorialRescue = Config.Bind("#0_Flag", "FlagTutorialRescue", true, "Whether to rescue in the tutorial quest.If you dare not proceed with the main quest, please turn it false.");
+		CE_FlagTutorialRescue = Config.Bind("#02_Flag", "FlagTutorialRescue", true, "Whether to rescue in the tutorial quest.If you dare not proceed with the main quest, please turn it false.");
 		
 		CE_WeightLimitMulti = Config.Bind("#1_ValueFloat", "WeightLimitMulti", 0.1f, "PC's Weight Limit will be multiplied by this value");
 
@@ -86,7 +97,8 @@ public class IFWMain : BaseUnityPlugin {
 		return (c.HasElement(EL_WeightLifting))? baseV + c.elements.Value(EL_WeightLifting) * modV: baseV;
 	}
 	public static bool CanKeepTask(Chara c){
-		if(!configFlagKeepHandleMod){return true;}
+		if(!configFlagKeepHandleMod && IsFairy(c)){return true;}
+		if(!configFlagKeepHandleModForAnyPlayer){return true;}
 		if(c.held.ChildrenAndSelfWeight > WeightCanKeepHandle(c)){
 			return false;
 		} else {
@@ -94,14 +106,24 @@ public class IFWMain : BaseUnityPlugin {
 		}
 	}
 	public static bool CanKeepLift(Chara c){
-		if(!configFlagKeepHandleMod){return true;}
+		if(!configFlagKeepHandleMod && IsFairy(c)){return true;}
+		if(!configFlagKeepHandleModForAnyPlayer){return true;}
 		if(c.held.ChildrenAndSelfWeight > WeightCanKeepLift(c)){
 			return false;
 		} else {
 			return true;
 		}
 	}
-	public static bool IsOnGlobalMap(){
+	private static bool IsFairy(Chara c){
+		return (c.HasElement(EL_FairyWeak))? true : false;
+	}
+	internal static bool HasWeightLimitPenalty(Chara c){
+		return (configFlagWeightLimitPenalty && IsFairy(c)) || (configFlagWeightLimitPenaltyForAnyPlayer);
+	}
+	internal static bool HasKeepHandlePenalty(Chara c){
+		return (configFlagKeepHandleMod && IsFairy(c)) || (configFlagKeepHandleModForAnyPlayer);
+	}
+	private static bool IsOnGlobalMap(){
         return (EClass.pc.currentZone.id == "ntyris") ? true : false;
     }
 }
@@ -117,12 +139,20 @@ public class IFWMain : BaseUnityPlugin {
 		public static void WeightLimit_PostPatch(Chara __instance, ref int __result)
 		{
             Chara c = __instance;
-			if (c.IsPC && c.HasElement(IFWMain.EL_FairyWeak) && IFWMain.configFlagWeightLimitPenalty)
+			if (c.IsPC){
+				if(IFWMain.HasWeightLimitPenalty(c)){
+					float rs = (float)(__result) * IFWMain.configWeightLimitMulti;
+					__result = (int)rs;
+				}
+			}
+			/*
+			if (c.IsPC && Main.IsFairy(c) && IFWMain.configFlagWeightLimitPenalty)
 			{
 				float rs = (float)(__result) * IFWMain.configWeightLimitMulti;
 				__result = (int)rs;
             	//__result = __instance.STR * 50 + __instance.END * 25 + __instance.Evalue(207) * 500 + 4500;
 			}
+			*/
 		}
 		
 	}
@@ -161,7 +191,7 @@ public class IFWMain : BaseUnityPlugin {
 		public static void TickConditionsPatch(Chara __instance){
 			Chara c = __instance;
 			
-			if(c.IsPC && c.HasElement(IFWMain.EL_FairyWeak) && c.held != null){
+			if(c.IsPC && IFWMain.HasKeepHandlePenalty(c) && c.held != null){
 				//if(!IFWMain.IsOnGlobalMap()){Debug.Log("[IFW}]C:" + c.ai.ToString());}
 				//debug
 				if(actBefore != null){
@@ -187,8 +217,8 @@ public class IFWMain : BaseUnityPlugin {
 		[HarmonyPatch(typeof(ActThrow), "CanThrow")]
 		public static bool CanThrowTest(Chara c,Thing t,Card target,Point p)
 		{
-			
-			if(t.SelfWeight > IFWMain.WeightCanKeepHandle(c) && IFWMain.configFlagKeepHandleMod){
+			if(!c.IsPC || !IFWMain.HasKeepHandlePenalty(c)){return true;}
+			if(t.SelfWeight > IFWMain.WeightCanKeepHandle(c)){
 				//if(t != null){Debug.Log("[IFW]throw : "+ t.ToString() + "->" + t.SelfWeight.ToString());}
 				//Msg.SayRaw("TooHeavy");
 				return false;
@@ -205,8 +235,10 @@ public class IFWMain : BaseUnityPlugin {
 		[HarmonyPatch(typeof(ActRanged), "CanPerform")]
 		public static bool CanActRangedTest(ActRanged __instance)
 		{
+			/*
 			ActRanged ar = __instance;
-			if(IFWMain.configFlagKeepHandleMod && ar != null){
+			if(!c.IsPC || !IFWMain.HasKeepHandlePenalty(Act.CC)){return true;}
+			if(ar != null){
 				Chara cc = Act.CC;
 				if(!cc.IsPC){return true;}
 				Chara tc = Act.CC;
@@ -222,7 +254,7 @@ public class IFWMain : BaseUnityPlugin {
 				//Msg.SayRaw("TooHeavy");
 				//return false;
 			}
-			
+			*/
 			return true;
 			
 		}	
@@ -252,14 +284,13 @@ public class IFWMain : BaseUnityPlugin {
 		[HarmonyPostfix]
 		[HarmonyPatch(typeof(Player), "RefreshCurrentHotItem")]
 		public static void PatchExe(){
-			if(IFWMain.configFlagKeepHandleMod){
-				Chara c = EClass.pc;
-				if(c.held != null){
-					if(!IFWMain.CanKeepTask(c)){
-						Msg.Say("このアイテムを扱うのにはちょっと重すぎる[" + c.held.ChildrenAndSelfWeight.ToString() + "/" + IFWMain.WeightCanKeepHandle(c).ToString() + "]");
-					}
+			Chara c = EClass.pc;
+			if(c.held != null){
+				if(IFWMain.HasKeepHandlePenalty(c) && !IFWMain.CanKeepTask(c)){
+					Msg.Say("このアイテムを扱うのにはちょっと重すぎる[" + c.held.ChildrenAndSelfWeight.ToString() + "/" + IFWMain.WeightCanKeepHandle(c).ToString() + "]");
 				}
 			}
+			
 		}
 	}
 }
