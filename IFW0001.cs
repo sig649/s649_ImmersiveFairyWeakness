@@ -164,18 +164,18 @@ public class IFWMain : BaseUnityPlugin {
 			if(c.held != null){
 				switch(c.ai){
 				case GoalManualMove : 
-					if(IFWMain.CanKeepLift(c)){
+					if(!IFWMain.CanKeepLift(c)){
 						Msg.Say("tooHeavyToEquip", c.held);
 						c.DropHeld();
 					}
 					break;
 				case TaskMine or TaskCut or TaskHarvest or AI_PlayMusic:
-					if(IFWMain.CanKeepLift(c)){
+					if(!IFWMain.CanKeepLift(c)){
 						Msg.Say("tooHeavyToEquip", c.held);
 						c.ai.Current.TryCancel(c.held);
 						c.DropHeld();
 					} else {
-						if(IFWMain.CanKeepTask(c)){
+						if(!IFWMain.CanKeepTask(c)){
 							Msg.Say("tooHeavyToEquip", c.held);
 							c.ai.Current.TryCancel(c.held);
 						}
