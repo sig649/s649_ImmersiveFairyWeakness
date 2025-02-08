@@ -86,17 +86,25 @@ public class IFWMain : BaseUnityPlugin {
         harmony.PatchAll();
     }
 	
-	public static int WeightCanKeepHandle(Chara c){
+	public static int WeightCanKeepHandle(Chara c){//手に持って扱えるアイテムの重さ
 		int baseV = configBaseWeightCanKeepHandle + c.STR * 2 + c.END * 1;
 		int modV = configModWeightCanKeepHandle;
 		return (c.HasElement(EL_WeightLifting))? baseV + c.elements.Value(EL_WeightLifting) * modV: baseV;
 	}
-	public static int WeightCanKeepLift(Chara c){
+	public static int WeightCanKeepLift(Chara c){//手に持って運べるアイテムの重さ
 		int baseV = configBaseWeightCanKeepLift + c.STR * 10 + c.END * 5;
 		int modV = configModWeightCanKeepLift;
 		return (c.HasElement(EL_WeightLifting))? baseV + c.elements.Value(EL_WeightLifting) * modV: baseV;
 	}
-	public static bool CanKeepTask(Chara c){
+	public static bool CanKeepTask(Chara c){//cがtaskを実行可能か
+		if(c.held == null){return true;}
+		if(HasKeepHandlePenalty(c)){
+			if(c.held.SelfWeight > WeightCanKeepHandle(c)){
+				return false;
+			}
+		}
+		return true;
+		/*
 		if(!configFlagKeepHandleMod && IsFairy(c)){return true;}
 		if(!configFlagKeepHandleModForAnyPlayer){return true;}
 		if(c.held.ChildrenAndSelfWeight > WeightCanKeepHandle(c)){
@@ -104,8 +112,17 @@ public class IFWMain : BaseUnityPlugin {
 		} else {
 			return true;
 		}
+		*/
 	}
-	public static bool CanKeepLift(Chara c){
+	public static bool CanKeepLift(Chara c){//cがheldを運搬可能か
+		if(c.held == null){return true;}
+		if(HasKeepHandlePenalty(c)){
+			if(c.held.ChildrenAndSelfWeight > WeightCanKeepLift(c)){
+				return false;
+			}
+		}
+		return true;
+		/*
 		if(!configFlagKeepHandleMod && IsFairy(c)){return true;}
 		if(!configFlagKeepHandleModForAnyPlayer){return true;}
 		if(c.held.ChildrenAndSelfWeight > WeightCanKeepLift(c)){
@@ -113,6 +130,7 @@ public class IFWMain : BaseUnityPlugin {
 		} else {
 			return true;
 		}
+		*/
 	}
 	private static bool IsFairy(Chara c){
 		return (c.HasElement(EL_FairyWeak))? true : false;
@@ -203,7 +221,13 @@ public class IFWMain : BaseUnityPlugin {
 				//１．重くて落としてしまう判定
 				//2.落とさないが中断してしまう判定
 				DropOrTaskStop(c);
-				
+				if(c.ai is GoalManualMove && c.held != null){
+					if(IFWMain.HasKeepHandlePenalty(c) && !IFWMain.CanKeepTask(c)){
+						if(EClass.rnd(9) == 0){
+							Msg.Say(c.GetName(NameStyle.Simple) +"に"+c.held.GetName(NameStyle.Simple) +"はちょっと重いようだ[" + c.held.SelfWeight.ToString() + "/" + IFWMain.WeightCanKeepHandle(c).ToString() + "]");
+						}
+					}
+				}
 				actBefore = c.ai;
 			}
 		}
@@ -217,13 +241,18 @@ public class IFWMain : BaseUnityPlugin {
 		[HarmonyPatch(typeof(ActThrow), "CanThrow")]
 		public static bool CanThrowTest(Chara c,Thing t,Card target,Point p)
 		{
-			if(!c.IsPC || !IFWMain.HasKeepHandlePenalty(c)){return true;}
-			if(t.SelfWeight > IFWMain.WeightCanKeepHandle(c)){
-				//if(t != null){Debug.Log("[IFW]throw : "+ t.ToString() + "->" + t.SelfWeight.ToString());}
-				//Msg.SayRaw("TooHeavy");
-				return false;
+			if(!c.IsPC){return true;}
+			if(IFWMain.HasKeepHandlePenalty(c)){
+				if(t.SelfWeight > IFWMain.WeightCanKeepHandle(c)){
+					//if(t != null){Debug.Log("[IFW]throw : "+ t.ToString() + "->" + t.SelfWeight.ToString());}
+					if(p != null){
+						Debug.Log("[IFW]p : "+ p.ToString() + "->" + p.Distance(c.pos).ToString());
+						if(p.Distance(c.pos) <= 1){return true;}
+					}
+					//Msg.SayRaw("TooHeavy");
+					return false;
+				}
 			}
-			
 			return true;
 			
 		}	
@@ -287,6 +316,10 @@ public class IFWMain : BaseUnityPlugin {
 			Chara c = EClass.pc;
 			if(c.held != null){
 				if(IFWMain.HasKeepHandlePenalty(c) && !IFWMain.CanKeepTask(c)){
+					string text = "[IFW]c.param->";
+					text += "[STR:" + c.STR.ToString() + "]"; 
+					text += "[END:" + c.END.ToString() + "]";
+					Debug.Log(text);
 					Msg.Say("このアイテムを扱うのにはちょっと重すぎる[" + c.held.ChildrenAndSelfWeight.ToString() + "/" + IFWMain.WeightCanKeepHandle(c).ToString() + "]");
 				}
 			}
