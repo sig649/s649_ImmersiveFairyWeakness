@@ -27,8 +27,10 @@ public class IFWMain : BaseUnityPlugin {
 	private static ConfigEntry<float> CE_WeightLimitMulti;//重量限界乗算値
 	private static ConfigEntry<int> CE_BaseWeightCanKeepHandle;//扱えるアイテムの重さの基本値
 	private static ConfigEntry<int> CE_ModWeightCanKeepHandle;//扱えるアイテムの重さの成長値
-	private static ConfigEntry<int> CE_BaseWeightCanKeepLift;//持ち上げられる重さの基本値
-	private static ConfigEntry<int> CE_ModWeightCanKeepLift;//持ち上げられる重さの成長値
+	private static ConfigEntry<int> CE_BaseWeightCanKeepLift;//持ち上げられる重さの基本値->WCKHの乗算に変更
+	private static ConfigEntry<int> CE_ModWeightCanKeepLift;//持ち上げられる重さの成長値->WCKHの乗算に変更
+	private static ConfigEntry<float> CE_MultiWeightCanKeepLift;//持ち上げられる重さ WCKHの乗算
+	
 	//---------------config props -------------------------------------------------------------------------------------
 	public static bool configFlagWeightLimitPenalty {
 		get {return CE_FlagWeightLimitPenalty.Value;}
@@ -59,11 +61,14 @@ public class IFWMain : BaseUnityPlugin {
 	public static int configModWeightCanKeepHandle {
 		get {return Mathf.Clamp(CE_ModWeightCanKeepHandle.Value,1,100);}
 	}
-	public static int configBaseWeightCanKeepLift {
+	public static int configBaseWeightCanKeepLift {//haisiyotei
 		get {return Mathf.Clamp(CE_BaseWeightCanKeepLift.Value,1000,100000);}
 	}
-	public static int configModWeightCanKeepLift {
+	public static int configModWeightCanKeepLift {//haisiyotei
 		get {return Mathf.Clamp(CE_ModWeightCanKeepLift.Value,1,200);}
+	}
+	public static float configMultiWeightCanKeepLift {
+		get {return Mathf.Clamp(CE_MultiWeightCanKeepLift.Value,1f,100f);}
 	}
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	
@@ -79,24 +84,28 @@ public class IFWMain : BaseUnityPlugin {
 
 		CE_BaseWeightCanKeepHandle = Config.Bind("#1_ValueInt", "BaseWeightCanKeepHandle", 2000, "Base value of the weight of items that can be handled");
 		CE_ModWeightCanKeepHandle = Config.Bind("#1_ValueInt", "ModWeightCanKeepHandle", 10, "Mod value of the weight of items that can be handled");
-		CE_BaseWeightCanKeepLift = Config.Bind("#1_ValueInt", "BaseWeightCanKeepLift", 10000, "Base value of the weight of items that can be lifted");
-		CE_ModWeightCanKeepLift = Config.Bind("#1_ValueInt", "ModWeightCanKeepLift", 50, "Mod value of the weight of items that can be lifted");
+		CE_BaseWeightCanKeepLift = Config.Bind("#1_ValueInt", "BaseWeightCanKeepLift", 10000, "Base value of the weight of items that can be lifted");//haisi
+		CE_ModWeightCanKeepLift = Config.Bind("#1_ValueInt", "ModWeightCanKeepLift", 50, "Mod value of the weight of items that can be lifted");//haisi
+		CE_MultiWeightCanKeepLift = Config.Bind("#1_ValueFloat", "MultiWeightCanKeepLift", 10f, "Multiplier value of the weight of items that can be lifted");
 
         var harmony = new Harmony("IFWMain");
         harmony.PatchAll();
     }
 	
-	public static int WeightCanKeepHandle(Chara c){//手に持って扱えるアイテムの重さ
+	internal static int WeightCanKeepHandle(Chara c){//手に持って扱えるアイテムの重さ
 		int baseV = configBaseWeightCanKeepHandle + c.STR * 2 + c.END * 1;
 		int modV = configModWeightCanKeepHandle;
 		return (c.HasElement(EL_WeightLifting))? baseV + c.elements.Value(EL_WeightLifting) * modV: baseV;
 	}
-	public static int WeightCanKeepLift(Chara c){//手に持って運べるアイテムの重さ
+	internal static int WeightCanKeepLift(Chara c){//手に持って運べるアイテムの重さ&持ち上げ限界
+		/*
 		int baseV = configBaseWeightCanKeepLift + c.STR * 10 + c.END * 5;
 		int modV = configModWeightCanKeepLift;
 		return (c.HasElement(EL_WeightLifting))? baseV + c.elements.Value(EL_WeightLifting) * modV: baseV;
+		*/
+		return (int)( WeightCanKeepHandle(c) * configMultiWeightCanKeepLift);
 	}
-	public static bool CanKeepTask(Chara c){//cがtaskを実行可能か
+	internal static bool CanKeepTask(Chara c){//cがtaskを実行可能か
 		if(c.held == null){return true;}
 		if(HasKeepHandlePenalty(c)){
 			if(c.held.SelfWeight > WeightCanKeepHandle(c)){
@@ -114,7 +123,7 @@ public class IFWMain : BaseUnityPlugin {
 		}
 		*/
 	}
-	public static bool CanKeepLift(Chara c){//cがheldを運搬可能か
+	internal static bool CanKeepLift(Chara c){//cがheldを運搬可能か
 		if(c.held == null){return true;}
 		if(HasKeepHandlePenalty(c)){
 			if(c.held.ChildrenAndSelfWeight > WeightCanKeepLift(c)){
@@ -132,7 +141,7 @@ public class IFWMain : BaseUnityPlugin {
 		}
 		*/
 	}
-	private static bool IsFairy(Chara c){
+	internal static bool IsFairy(Chara c){
 		return (c.HasElement(EL_FairyWeak))? true : false;
 	}
 	internal static bool HasWeightLimitPenalty(Chara c){
@@ -141,7 +150,7 @@ public class IFWMain : BaseUnityPlugin {
 	internal static bool HasKeepHandlePenalty(Chara c){
 		return (configFlagKeepHandleMod && IsFairy(c)) || (configFlagKeepHandleModForAnyPlayer);
 	}
-	private static bool IsOnGlobalMap(){
+	internal static bool IsOnGlobalMap(){
         return (EClass.pc.currentZone.id == "ntyris") ? true : false;
     }
 }
@@ -183,18 +192,18 @@ public class IFWMain : BaseUnityPlugin {
 				switch(c.ai){
 				case GoalManualMove : 
 					if(!IFWMain.CanKeepLift(c)){
-						Msg.Say("tooHeavyToEquip", c.held);
+						Msg.Say("tooHeavy", c.held);
 						c.DropHeld();
 					}
 					break;
 				case TaskMine or TaskCut or TaskHarvest or AI_PlayMusic:
 					if(!IFWMain.CanKeepLift(c)){
-						Msg.Say("tooHeavyToEquip", c.held);
+						Msg.Say("tooHeavy", c.held);
 						c.ai.Current.TryCancel(c.held);
 						c.DropHeld();
 					} else {
 						if(!IFWMain.CanKeepTask(c)){
-							Msg.Say("tooHeavyToEquip", c.held);
+							Msg.Say("tooHeavy", c.held);
 							c.ai.Current.TryCancel(c.held);
 						}
 					}
@@ -246,7 +255,7 @@ public class IFWMain : BaseUnityPlugin {
 				if(t.SelfWeight > IFWMain.WeightCanKeepHandle(c)){
 					//if(t != null){Debug.Log("[IFW]throw : "+ t.ToString() + "->" + t.SelfWeight.ToString());}
 					if(p != null){
-						Debug.Log("[IFW]p : "+ p.ToString() + "->" + p.Distance(c.pos).ToString());
+						//Debug.Log("[IFW]p : "+ p.ToString() + "->" + p.Distance(c.pos).ToString());
 						if(p.Distance(c.pos) <= 1){return true;}
 					}
 					//Msg.SayRaw("TooHeavy");
@@ -319,12 +328,29 @@ public class IFWMain : BaseUnityPlugin {
 					string text = "[IFW]c.param->";
 					text += "[STR:" + c.STR.ToString() + "]"; 
 					text += "[END:" + c.END.ToString() + "]";
-					Debug.Log(text);
-					Msg.Say("このアイテムを扱うのにはちょっと重すぎる[" + c.held.ChildrenAndSelfWeight.ToString() + "/" + IFWMain.WeightCanKeepHandle(c).ToString() + "]");
+					//Debug.Log(text);
+					Msg.Say(c.held.GetName(NameStyle.Simple) +"が重くてうまく扱えそうにない[" + c.held.ChildrenAndSelfWeight.ToString() + "/" + IFWMain.WeightCanKeepHandle(c).ToString() + "]");
 				}
 			}
 			
 		}
+	}
+
+	[HarmonyPatch]
+	public class TryHoldCancelPatch
+	{
+		[HarmonyPrefix]
+		[HarmonyPatch(typeof(Chara), "HoldCard")]
+		public static bool PrePatch(Chara __instance, Card t)
+		{
+			Chara ic = __instance;
+			if(t.ExistsOnMap && ic.IsPC && IFWMain.HasKeepHandlePenalty(ic) && t.SelfWeight > IFWMain.WeightCanKeepLift(ic)){
+				//Debug.Log("[IFW]Motemasen");
+				Msg.Say(t.GetName(NameStyle.Simple) +"は"+ ic.GetName(NameStyle.Simple) +"には重すぎる[" + t.SelfWeight.ToString() + "/" + IFWMain.WeightCanKeepLift(ic).ToString() + "]");
+				return false;
+			}
+			return true;
+		}	
 	}
 }
 //----template-----------------------------------------
